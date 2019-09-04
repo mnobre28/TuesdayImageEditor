@@ -1,14 +1,5 @@
 from PIL import Image, ImageOps, ImageChops
 import os
-        # original_pixels = list(image.getdata())
-        # resulting_pixels = []
-        # for px in original_pixels:
-        #     current_pixel = []
-        #     for value in px:
-        #         current_pixel.append(round(value*0.3))
-        #     resulting_pixels.append(tuple(current_pixel))
-        # result_image = Image.new(image.mode, image.size)
-        # result_image.putdata(tuple(resulting_pixels))
 
 
 class ImageEditor(object):
@@ -38,6 +29,7 @@ class ImageEditor(object):
             print("Greyscale operation done: saved to file " + file_name)
         return result_image
 
+    # automatic
     def weighted_grey_scale(self, image, file_name="weighted_greyscale.jpg"):
         """ Gets as grey scale version of the original image. """
         result_image = ImageOps.grayscale(image)
@@ -46,6 +38,7 @@ class ImageEditor(object):
             print("Weighted greyscale operation done: saved to file " + file_name)
         return result_image
 
+    # automatic
     def negative(self, image, file_name="threshold.jpg"):
         """ Gets as negative version of the original image. """
         result_image = ImageOps.invert(image)
@@ -62,6 +55,7 @@ class ImageEditor(object):
             print("Threshold operation done: saved to file " + file_name)
         return result_image
 
+    # automatic
     def addition(self, first_image, second_image, file_name="addition.jpg"):
         result_image = ImageChops.add(first_image, second_image, 2)
         if self.save_result_on_file:
@@ -69,6 +63,7 @@ class ImageEditor(object):
             print("Addition operation done: saved to file " + file_name)
         return result_image
 
+    # automatic
     def weighted_addition(self, first_image, second_image, alpha=0.7,
                           file_name="weighted_addition.jpg"):
         result_image = Image.blend(first_image, second_image, alpha)
@@ -77,6 +72,7 @@ class ImageEditor(object):
             print("Weighted addition operation done: saved to file " + file_name)
         return result_image
 
+    # automatic
     def subtraction(self, first_image, second_image, file_name="subtraction.jpg"):
         result_image = ImageChops.subtract(first_image, second_image, 2)
         if self.save_result_on_file:
@@ -84,9 +80,47 @@ class ImageEditor(object):
             print("Subtraction operation done: saved to file " + file_name)
         return result_image
 
-    def weighted_subtraction(self, first_image, second_image,
+    def weighted_subtraction(self, first_image, second_image, weight=0.7,
                              file_name="weighted_subtraction.jpg"):
-        raise NotImplementedError
+        first_image_data = first_image.getdata()
+        second_image_data = second_image.getdata()
+        resulting_image_data = []
+
+        for i in range(0, len(first_image_data)):
+            resulting_pixel = self._weighted_subtract_pixel(first_image_data[i], second_image_data[i], weight)
+            resulting_image_data.append(tuple(resulting_pixel))
+        result_image = Image.new(first_image.mode, first_image.size)
+        result_image.putdata(tuple(resulting_image_data))
+        if self.save_result_on_file:
+            self.file_manager.save_image(result_image, file_name)
+            print("Weighted subtraction done: saved to file " + file_name)
+        return result_image
+
+    @staticmethod
+    def _weighted_subtract_pixel(first_pixel, second_pixel, weight):
+        resulting_pixel = [0, 0, 0]
+        for i in range(0, 3):
+            resulting_pixel[i] = round((first_pixel[i] * weight) - (second_pixel[i] * (1-weight)))
+        return resulting_pixel
+
+    @staticmethod
+    def _modify_all_pixels_of_a_color(image, color='r', color_modifier=1.0, others_modifier=0.0):
+        image_data = image.getdata()
+        if color == 'b':
+            modified_pixels = [(round(d[0]*others_modifier),
+                                round(d[1]*others_modifier),
+                                round(d[2]*color_modifier)) for d in image_data]
+        elif color == 'g':
+            modified_pixels = [(round(d[0]*others_modifier),
+                                round(d[1]*color_modifier),
+                                round(d[2]*others_modifier)) for d in image_data]
+        else:
+            modified_pixels = [(round(d[0]*color_modifier),
+                                round(d[1]*others_modifier),
+                                round(d[2]*others_modifier)) for d in image_data]
+        result_image = Image.new(image.mode, image.size)
+        result_image.putdata(modified_pixels)
+        return result_image
 
     def split_color(self, image, color='r', file_name="split_color.jpg"):
         result_image = self._modify_all_pixels_of_a_color(image, color)
@@ -106,34 +140,27 @@ class ImageEditor(object):
     def histogram(self, image):
         raise NotImplementedError
 
-    @staticmethod
-    def _modify_all_pixels_of_a_color(image, color='r', color_modifier=1.0, others_modifier=0.0):
-        image_data = image.getdata()
-        if color == 'b':
-            modified_pixels = [(round(d[0]*others_modifier), 
-                                round(d[1]*others_modifier), 
-                                round(d[2]*color_modifier)) for d in image_data]
-        elif color == 'g':
-            modified_pixels = [(round(d[0]*others_modifier), 
-                                round(d[1]*color_modifier), 
-                                round(d[2]*others_modifier)) for d in image_data]
-        else:
-            modified_pixels = [(round(d[0]*color_modifier), 
-                                round(d[1]*others_modifier), 
-                                round(d[2]*others_modifier)) for d in image_data]
-        result_image = Image.new(image.mode, image.size)
-        result_image.putdata(modified_pixels)
-        return result_image
-
     def convolution(self, image, file_name="convolution.jpg"):
-        pass
-
-    @staticmethod
-    def _get_convolution_sum_at(x, y, image, detection_mask):
-        pass
-
-    def dilatation(self):
         raise NotImplemented
+
+    def dilatation(self, image, element, file_name="dilatation.jpg"):
+        image_matrix = StructuralElement.image_array_to_matrix(image.getdata(),
+                                                               image.width,
+                                                               image.height)
+        # começar com imagem toda preta!
+        for i in range(1, image.width-3):
+            for j in range(1, image.height-3):
+                current_pixel = image_matrix[i][j]
+                if current_pixel > 0:
+                    for a in range(-1, 2):
+                        for b in range(-1, 2):
+                            image_matrix[i+a][j+b] = element.kernel[a+1][b+1]
+        result_image = Image.new(image.mode, image.size)
+        result_image.putdata(tuple(StructuralElement.image_matrix_to_array(image_matrix)))
+        if self.save_result_on_file:
+            self.file_manager.save_image(result_image, file_name)
+            print("Dilatation subtraction done: saved to file " + file_name)
+        return result_image
 
 
 class FileManager(object):
@@ -162,49 +189,48 @@ class FileManager(object):
 
 
 class StructuralElement(object):
-    def __init__(self, type="", size=3, hot_spot_color=0):
-        self.size = size
-        self.element = []
-        if type == "convolution":
-            self._set_structure_to_convolution_matrix()
+    def __init__(self, kernel_type=None):
+        self.kernel = []
+        if kernel_type is None:
+            self.kernel = [[0, 0, 0],
+                           [255, 255, 255],
+                           [0, 0, 0]]
 
-    def _set_structure_to_convolution_matrix(self):
-        for i in range(0, self.size):
-            row = []
-            for j in range(0, self.size):
-                row.append(-1)
-            self.element.append(row)
-        self.get_or_update_hot_spot(8)
+    def get_hot_spot(self):
+        return self.kernel[1][1]
 
     def get_offset(self):
-        return round(self.size // 2)
+        return round(len(self.kernel) // 2)
 
-    def get_or_update_hot_spot(self, hot_spot_value=None):
-        center_position = round(self.size // 2)
-        if hot_spot_value is not None:
-            self.element[center_position][center_position] = hot_spot_value
-        return self.element[center_position][center_position]
+    @staticmethod
+    def image_array_to_matrix(image_data, image_width, image_height):
+        matrix = []
+        for i in range(0, image_width):
+            column = []
+            for j in range(image_height*i, image_height*(i+1)):
+                column.append(image_data[j])
+            matrix.append(column)
+        return matrix
 
-    def set_element_values(self, new_values):
-        self.element = new_values
+    @staticmethod
+    def get_all_black_image_matrix():
+        raise NotImplemented
 
-    def get_sum(self):
-        total_sum = 0
-        for row in self.element:
-            total_sum = total_sum + sum(row)
-        return total_sum
-
-    def get_or_set_element_at(self, x, y, value=None):
-        if value is not None:
-            self.element[x][y] = value
-        return self.element[x][y]
+    @staticmethod
+    def image_matrix_to_array(image_matrix):
+        image_array = []
+        for row in image_matrix:
+            image_array += row
+        return image_array
 
 
 if __name__ == '__main__':
     fm = FileManager()
-    img = fm.get_copy("tulips.jpg")
-    si = fm.get_copy("hydrangeas.jpg")
+    tulip = fm.get_copy("tulips.jpg")
+    hydra = fm.get_copy("hydrangeas.jpg")
+    bw = fm.get_copy("blackwhite.jpg")
     image_editor = ImageEditor()
-    result = image_editor.convolution(img)
+
+    result = image_editor.dilatation(bw, StructuralElement())
 
     result.show()
