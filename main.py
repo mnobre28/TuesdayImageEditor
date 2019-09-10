@@ -144,9 +144,14 @@ class ImageEditor(object):
         raise NotImplemented
 
     def dilatation(self, image, element, file_name="dilatation.jpg"):
+        black_image = FileManager().get_black_copy()
         image_matrix = StructuralElement.image_array_to_matrix(image.getdata(),
                                                                image.width,
                                                                image.height)
+        destination_matrix = StructuralElement.image_array_to_matrix(black_image.getdata(),
+                                                                     black_image.width,
+                                                                     black_image.height)
+
         # começar com imagem toda preta!
         for i in range(1, image.width-3):
             for j in range(1, image.height-3):
@@ -154,9 +159,11 @@ class ImageEditor(object):
                 if current_pixel > 0:
                     for a in range(-1, 2):
                         for b in range(-1, 2):
-                            image_matrix[i+a][j+b] = element.kernel[a+1][b+1]
+                            destination_matrix[i+a][j+b] = element.kernel[a+1][b+1]
+                else:
+                    pass
         result_image = Image.new(image.mode, image.size)
-        result_image.putdata(tuple(StructuralElement.image_matrix_to_array(image_matrix)))
+        result_image.putdata(tuple(StructuralElement.image_matrix_to_array(destination_matrix)))
         if self.save_result_on_file:
             self.file_manager.save_image(result_image, file_name)
             print("Dilatation subtraction done: saved to file " + file_name)
@@ -174,6 +181,9 @@ class FileManager(object):
             return original.copy()
         except Exception as e:
             print(e)
+
+    def get_black_copy(self):
+        return self.get_copy("allblack.jpg")
 
     def load_image(self, image_name):
         try:
